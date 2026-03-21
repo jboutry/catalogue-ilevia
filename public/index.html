@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Catalogue ilévia</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <h1>Catalogue de données ilévia</h1>
+  <input type="search" 
+         id="search" 
+         placeholder="Rechercher un dataset..." 
+         oninput="rechercher(this.value)"/>
+  <div id="filtres"></div>
+  <div id="grid"></div>
+  <div id="overlay">
+    <div id="panel"></div>
+</div>
+  <script src="js/api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
