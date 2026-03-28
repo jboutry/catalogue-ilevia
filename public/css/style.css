@@ -207,3 +207,48 @@
     padding: 2px 9px;
     border-radius: 10px;
 }
+
+.lineage {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.lineage-etape {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.lineage-source {
+    background: #E1F5EE;
+    color: #085041;
+}
+
+.lineage-transformation {
+    background: #E6F1FB;
+    color: #0C447C;
+}
+
+.lineage-destination {
+    background: #EEEDFE;
+    color: #3C3489;
+}
+
+.lineage-type {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.7;
+    min-width: 90px;
+}
+
+.lineage-fleche {
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+}

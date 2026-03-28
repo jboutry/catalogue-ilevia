@@ -1,15 +1,12 @@
-// Chargement des dépendances
 require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const cors    = require('cors');
 
-// Initialisation
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connexion PostgreSQL
 const pool = new Pool({
     host:     process.env.PG_HOST,
     port:     process.env.PG_PORT,
@@ -33,41 +30,44 @@ app.get('/api/datasets', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Route : detail d'un dataset avec lineage
 app.get('/api/datasets/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query(
+
+        const dataset = await pool.query(
             `SELECT * FROM gouvernance.v_catalogue WHERE id = $1`,
             [id]
         );
-        if (!result.rows.length) {
+
+        if (!dataset.rows.length) {
             return res.status(404).json({ error: 'Dataset introuvable' });
         }
-        res.json(result.rows[0]);
+
+        const lineage = await pool.query(
+            `SELECT etape, libelle, type_etape
+             FROM gouvernance.lineage
+             WHERE id_dataset = $1
+             ORDER BY etape ASC`,
+            [id]
+        );
+
+        res.json({
+            ...dataset.rows[0],
+            lineage: lineage.rows
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-
-// Fichiers statiques
-app.use(express.static('public'));
-
-// Lancement du serveur
-const PORT = 3000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Serveur démarré sur http://localhost:${PORT}`);
-});
-
+// Route : retards temps reel
 app.get('/api/retards', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT
-                route_id,
-                stop_name,
-                stop_lat,
-                stop_lon,
-                ROUND(retard_minutes::numeric, 1) AS retard_minutes
+            SELECT route_id, stop_name, stop_lat, stop_lon,
+                   ROUND(retard_minutes::numeric, 1) AS retard_minutes
             FROM transport.v_retards
             WHERE retard_minutes >= 2
             ORDER BY retard_minutes DESC
@@ -79,7 +79,7 @@ app.get('/api/retards', async (req, res) => {
     }
 });
 
-
+// Route : passages prochaine heure
 app.get('/api/passages', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -101,4 +101,12 @@ app.get('/api/passages', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// Fichiers statiques — TOUJOURS après les routes API
+app.use(express.static('public'));
+
+const PORT = 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Serveur démarré sur http://localhost:${PORT}`);
 });
