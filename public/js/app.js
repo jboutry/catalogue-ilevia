@@ -2,7 +2,12 @@ let tousLesDatasets = [];
 let filtreActif = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    tousLesDatasets = await fetchDatasets();
+    const [datasets, qualite] = await Promise.all([
+        fetchDatasets(),
+        fetchQualite()
+    ]);
+    tousLesDatasets = datasets;
+    renderDashboard(qualite);
     renderCartes(tousLesDatasets);
     renderFiltres(tousLesDatasets);
 });

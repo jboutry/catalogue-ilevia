@@ -91,3 +91,31 @@ function renderFiltres(datasets) {
             </button>
         `).join('');
 }
+
+function renderDashboard(q) {
+    const dashboard = document.getElementById('dashboard');
+    dashboard.innerHTML = `
+        <div class="dashboard">
+            <div class="dash-card">
+                <div class="dash-valeur">${q.total}</div>
+                <div class="dash-label">Datasets</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-valeur" style="color:${q.score_moyen >= 90 ? '#1D9E75' : q.score_moyen >= 75 ? '#BA7517' : '#E24B4A'}">${q.score_moyen}%</div>
+                <div class="dash-label">Qualité moyenne</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-valeur" style="color:#1D9E75">${q.bonne}</div>
+                <div class="dash-label">Bonne qualité</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-valeur" style="color:#BA7517">${q.moyenne}</div>
+                <div class="dash-label">Qualité moyenne</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-valeur" style="color:#E24B4A">${q.faible}</div>
+                <div class="dash-label">Faible qualité</div>
+            </div>
+        </div>
+    `;
+}

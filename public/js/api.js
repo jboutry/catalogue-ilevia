@@ -11,3 +11,9 @@ async function fetchDatasetDetail(id) {
     const data = await response.json();
     return data;
 }
+
+async function fetchQualite() {
+    const response = await fetch('/api/qualite');
+    const data = await response.json();
+    return data;
+}

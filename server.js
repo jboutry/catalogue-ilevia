@@ -103,6 +103,26 @@ app.get('/api/passages', async (req, res) => {
     }
 });
 
+app.get('/api/qualite', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                COUNT(DISTINCT d.id)                                        AS total,
+                ROUND(AVG(q.score_global::numeric), 1)                     AS score_moyen,
+                COUNT(*) FILTER (WHERE q.score_global::numeric >= 90)      AS bonne,
+                COUNT(*) FILTER (WHERE q.score_global::numeric >= 75
+                    AND q.score_global::numeric < 90)                      AS moyenne,
+                COUNT(*) FILTER (WHERE q.score_global::numeric < 75)       AS faible
+            FROM gouvernance.dataset d
+            LEFT JOIN gouvernance.qualite_historique q ON q.id_dataset = d.id
+            WHERE d.actif = true
+        `);
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Fichiers statiques — TOUJOURS après les routes API
 app.use(express.static('public'));
 
