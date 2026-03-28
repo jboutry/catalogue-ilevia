@@ -28,3 +28,8 @@ function rechercher(texte) {
 
 window.rechercher = rechercher;
 window.filtrer = filtrer;
+
+function fermerPanel() {
+    document.getElementById('overlay').classList.remove('open');
+}
+window.fermerPanel = fermerPanel;

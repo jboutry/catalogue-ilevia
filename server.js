@@ -55,7 +55,26 @@ app.use(express.static('public'));
 
 // Lancement du serveur
 const PORT = 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Serveur démarré sur http://localhost:${PORT}`);
 });
 
+app.get('/api/retards', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                route_id,
+                stop_name,
+                stop_lat,
+                stop_lon,
+                ROUND(retard_minutes::numeric, 1) AS retard_minutes
+            FROM transport.v_retards
+            WHERE retard_minutes >= 2
+            ORDER BY retard_minutes DESC
+            LIMIT 50
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
