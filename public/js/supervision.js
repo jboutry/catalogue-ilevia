@@ -1,14 +1,13 @@
+let tousLesRetards = [];
+
 const carte = L.map('carte').setView([50.633, 3.058], 12);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CartoDB'
 }).addTo(carte);
 
-async function chargerRetards() {
-    const response = await fetch('/api/retards');
-    const data = await response.json();
-    afficherAlertes(data);
-}
+const marqueurs = [];
+const marqueursPonctuels = [];
 
 function couleurRetard(minutes) {
     if (minutes >= 10) return '#E24B4A';
@@ -22,7 +21,33 @@ function classeRetard(minutes) {
     return 'retard-faible';
 }
 
-const marqueurs = [];
+async function chargerPassages() {
+    const response = await fetch('/api/passages');
+    const data = await response.json();
+
+    marqueursPonctuels.forEach(m => carte.removeLayer(m));
+    marqueursPonctuels.length = 0;
+
+    data.forEach(p => {
+        const cercle = L.circleMarker(
+            [p.stop_lat, p.stop_lon], {
+            radius: 5,
+            fillColor: '#1D9E75',
+            color: '#fff',
+            weight: 1,
+            fillOpacity: 0.5,
+            zIndexOffset: -100
+        }).addTo(carte);
+
+        cercle.bindPopup(`
+            <strong>${p.stop_name}</strong><br>
+            Ligne ${p.route_id}<br>
+            Passage : ${new Date(p.heure_theorique).toLocaleTimeString('fr-FR')}
+        `);
+
+        marqueursPonctuels.push(cercle);
+    });
+}
 
 function afficherAlertes(retards) {
     marqueurs.forEach(m => carte.removeLayer(m));
@@ -30,6 +55,11 @@ function afficherAlertes(retards) {
 
     const liste = document.getElementById('liste-alertes');
     liste.innerHTML = '';
+
+    document.getElementById('compteur').textContent =
+        retards.length > 0
+        ? `${retards.length} arrêt${retards.length > 1 ? 's' : ''} en retard`
+        : 'Réseau nominal';
 
     retards.forEach(r => {
         const retard = parseFloat(r.retard_minutes);
@@ -66,5 +96,43 @@ function afficherAlertes(retards) {
     }
 }
 
-chargerRetards();
-setInterval(chargerRetards, 60000);
+function renderFiltresLignes(retards) {
+    const lignes = [...new Set(retards.map(r => r.route_id))].sort();
+    const filtres = document.getElementById('filtres-lignes');
+    filtres.innerHTML =
+        `<button class="filtre-ligne actif" onclick="filtrerLigne(null, this)">Toutes</button>` +
+        lignes.map(l => `
+            <button class="filtre-ligne" onclick="filtrerLigne('${l}', this)">
+                ${l}
+            </button>
+        `).join('');
+}
+
+function filtrerLigne(ligne, el) {
+    document.querySelectorAll('.filtre-ligne').forEach(b => b.classList.remove('actif'));
+    el.classList.add('actif');
+    if (!ligne) {
+        afficherAlertes(tousLesRetards);
+    } else {
+        const filtres = tousLesRetards.filter(r => r.route_id === ligne);
+        afficherAlertes(filtres);
+    }
+}
+
+async function chargerRetards() {
+    const response = await fetch('/api/retards');
+    const data = await response.json();
+    tousLesRetards = data;
+    renderFiltresLignes(tousLesRetards);
+    afficherAlertes(tousLesRetards);
+}
+
+async function chargerTout() {
+    await chargerPassages();
+    await chargerRetards();
+}
+
+window.filtrerLigne = filtrerLigne;
+
+chargerTout();
+setInterval(chargerTout, 60000);

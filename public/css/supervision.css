@@ -64,3 +64,36 @@ header a {
 .retard-fort  { background: #FCEBEB; color: #A32D2D; }
 .retard-moyen { background: #FAEEDA; color: #633806; }
 .retard-faible{ background: #E1F5EE; color: #085041; }
+
+#compteur {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    color: #fff;
+}
+
+#filtres-lignes {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+    background: #fff;
+    border-bottom: 1px solid #e8e7df;
+    flex-wrap: wrap;
+}
+
+.filtre-ligne {
+    padding: 3px 12px;
+    border-radius: 20px;
+    border: 1.5px solid #ddd;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.filtre-ligne.actif {
+    background: #E6F1FB;
+    border-color: #185FA5;
+    color: #185FA5;
+    font-weight: 500;
+}

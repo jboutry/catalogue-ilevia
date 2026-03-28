@@ -78,3 +78,27 @@ app.get('/api/retards', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
+app.get('/api/passages', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT DISTINCT ON (st.stop_id, t.route_id)
+                t.route_id,
+                s.stop_name,
+                s.stop_lat,
+                s.stop_lon,
+                (CURRENT_DATE + st.departure_time::interval) AS heure_theorique
+            FROM transport.stop_times st
+            JOIN transport.stops s ON st.stop_id = s.stop_id
+            JOIN transport.trips t ON st.trip_id = t.trip_id
+            WHERE (CURRENT_DATE + st.departure_time::interval)
+                BETWEEN now() AND now() + INTERVAL '1 hour'
+            ORDER BY st.stop_id, t.route_id, heure_theorique ASC
+            LIMIT 500
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});

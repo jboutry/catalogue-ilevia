@@ -15,7 +15,7 @@ const GTFS_RT_URL = 'https://proxy.transport.data.gouv.fr/resource/ilevia-lille-
 // Correction décalage horaire ilévia
 // Le flux publie en heure d'été (UTC+2) même en hiver (UTC+1)
 // Bug connu côté producteur — à retirer quand ilévia corrigera
-const CORRECTION_MS = -3600000; // -1 heure en millisecondes
+const CORRECTION_MS = 0;
 
 async function collecterDonnees() {
     try {
