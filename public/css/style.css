@@ -292,3 +292,30 @@
     font-size: 13px;
     margin-top: 6px;
 }
+
+.main-header {
+    background: #185FA5;
+    color: #fff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.main-header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+}
+
+.lien-supervision {
+    color: #fff;
+    font-size: 13px;
+    text-decoration: none;
+    opacity: .8;
+}
+
+.lien-supervision:hover {
+    opacity: 1;
+}
