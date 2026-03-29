@@ -38,3 +38,12 @@ function fermerPanel() {
     document.getElementById('overlay').classList.remove('open');
 }
 window.fermerPanel = fermerPanel;
+
+async function rechargerDatasets() {
+    tousLesDatasets = await fetchDatasets();
+    const qualite = await fetchQualite();
+    renderDashboard(qualite);
+    renderCartes(tousLesDatasets);
+    renderFiltres(tousLesDatasets);
+}
+window.rechargerDatasets = rechargerDatasets;

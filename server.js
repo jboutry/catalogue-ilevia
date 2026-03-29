@@ -123,6 +123,37 @@ app.get('/api/qualite', async (req, res) => {
     }
 });
 
+app.patch('/api/datasets/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { qualite_score, qualite_detail, alerte, owner_metier, frequence_maj } = req.body;
+
+        await pool.query(`
+            UPDATE gouvernance.dataset
+            SET owner_metier = $1,
+                frequence_maj = $2,
+                alerte = $3,
+                mis_a_jour_le = now()
+            WHERE id = $4
+        `, [owner_metier, frequence_maj, alerte, id]);
+
+        await pool.query(`
+            UPDATE gouvernance.qualite_historique
+            SET score_global = $1,
+                detail = $2,
+                calcule_le = now()
+            WHERE id_dataset = $3
+        `, [qualite_score, qualite_detail, id]);
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
+
 // Fichiers statiques — TOUJOURS après les routes API
 app.use(express.static('public'));
 
