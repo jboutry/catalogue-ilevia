@@ -9,7 +9,6 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 
 const marqueurs = [];
 const marqueursPonctuels = [];
-const marqueurArrets = [];
 let tracesLignes = L.layerGroup();
 
 function iconeType(route_type) {
@@ -77,59 +76,97 @@ async function chargerTraces() {
     }).addTo(tracesLignes);
 }
 
-async function chargerArrets() {
-    const response = await fetch('/api/arrets');
-    const data = await response.json();
-    data.forEach(a => {
-        const cercle = L.circleMarker([a.stop_lat, a.stop_lon], {
-            radius: 3,
-            fillColor: '#888',
-            color: '#fff',
-            weight: 1,
-            fillOpacity: 0.6,
-            zIndexOffset: -200
-        }).addTo(carte);
-        cercle.bindPopup(`<strong>${a.stop_name}</strong>`);
-        marqueurArrets.push(cercle);
-    });
-}
-
 async function chargerPassages() {
-    const response = await fetch('/api/passages');
-    const data = await response.json();
+    const [passagesRes, retardsRes] = await Promise.all([
+        fetch('/api/passages'),
+        fetch('/api/retards')
+    ]);
+    const data = await passagesRes.json();
+    const retards = await retardsRes.json();
+
+    const indexRetards = {};
+    retards.forEach(r => {
+        r.lignes.forEach(l => {
+            const key = r.stop_name + '|' + l.route_id;
+            indexRetards[key] = l.retard_minutes;
+        });
+    });
 
     marqueursPonctuels.forEach(m => carte.removeLayer(m));
     marqueursPonctuels.length = 0;
 
     data.forEach(p => {
-        const couleur = p.route_color ? '#' + p.route_color : '#888';
-        const icone = iconeType(p.route_type);
+        const premiereLigne = p.lignes[0];
+        const couleur = premiereLigne?.route_color ? '#' + premiereLigne.route_color : '#888';
+        const aRetard = p.lignes.some(l => indexRetards[p.stop_name + '|' + l.route_id]);
 
-        const cercle = L.circleMarker([p.stop_lat, p.stop_lon], {
-            radius: 4,
-            fillColor: couleur,
-            color: '#fff',
-            weight: 1,
-            fillOpacity: 0.6,
-            zIndexOffset: -100
-        }).addTo(carte);
+        let marqueur;
 
-        cercle.bindPopup(`
-            <strong>${icone} Ligne ${p.route_id}</strong><br>
-            ${p.stop_name}<br>
-            <span style="color:#666;font-size:11px">
-                Prochain passage : ${new Date(p.heure_theorique).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}
-            </span>
+        if (aRetard) {
+            const icon = L.divIcon({
+                className: '',
+                html: `
+                    <div style="position:relative;width:16px;height:16px">
+                        <div class="halo-marker" style="
+                            position:absolute;
+                            width:16px;height:16px;
+                            border-radius:50%;
+                            border:2px solid #E24B4A;
+                            box-shadow: 0 0 4px 2px #E24B4A;
+                            top:0;left:0;
+                        "></div>
+                        <div style="
+                            position:absolute;
+                            width:8px;height:8px;
+                            background:${couleur};
+                            border:1px solid #fff;
+                            border-radius:50%;
+                            top:4px;left:4px;
+                        "></div>
+                    </div>
+                `,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+            marqueur = L.marker([p.stop_lat, p.stop_lon], { icon }).addTo(carte);
+        } else {
+            marqueur = L.circleMarker([p.stop_lat, p.stop_lon], {
+                radius: 4,
+                fillColor: couleur,
+                color: '#fff',
+                weight: 1,
+                fillOpacity: 0.6,
+                zIndexOffset: -100
+            }).addTo(carte);
+        }
+
+        const lignesHtml = p.lignes.map(l => {
+            const retard = indexRetards[p.stop_name + '|' + l.route_id];
+            return `
+                <div style="margin:3px 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <span style="background:#${l.route_color || '185FA5'};color:#${l.route_text_color || 'FFFFFF'};padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600">
+                        ${iconeType(l.route_type)} ${l.route_id}
+                    </span>
+                    <span style="font-size:11px">→ ${l.trip_headsign || ''}</span>
+                    <span style="font-size:11px;color:#666;margin-left:auto">
+                        ${new Date(l.heure_theorique).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}
+                    </span>
+                    ${retard ? `<span style="color:#E24B4A;font-weight:600;font-size:11px">+${retard} min</span>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        marqueur.bindPopup(`
+            <strong>${p.stop_name}</strong>
+            ${aRetard ? '<span style="color:#E24B4A;font-size:11px;font-weight:600"> ⚠ Retard</span>' : ''}
+            <br>${lignesHtml}
         `);
 
-        marqueursPonctuels.push(cercle);
+        marqueursPonctuels.push(marqueur);
     });
 }
 
 function afficherAlertes(retards) {
-    marqueurs.forEach(m => carte.removeLayer(m));
-    marqueurs.length = 0;
-
     const liste = document.getElementById('liste-alertes');
     liste.innerHTML = '';
 
@@ -139,52 +176,22 @@ function afficherAlertes(retards) {
         : 'Réseau nominal';
 
     retards.forEach(r => {
-        const retard = parseFloat(r.retard_minutes);
-        const ligne = toutesLesLignes[r.route_id];
-        const icone = ligne ? iconeType(ligne.route_type) : '🚌';
-        const couleur = r.route_color ? '#' + r.route_color : couleurRetard(retard);
-
-        const halo = L.divIcon({
-            className: '',
-            html: `
-                <div class="halo-marker" style="
-                    width:12px;height:12px;
-                    border-radius:50%;
-                    border:2px solid #E24B4A;
-                    box-shadow: 0 0 4px 2px #E24B4A;
-                "></div>
-            `,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
+        r.lignes.forEach(l => {
+            liste.innerHTML += `
+                <div class="alerte">
+                    <span class="alerte-badge ${classeRetard(l.retard_minutes)}">
+                        +${l.retard_minutes} min
+                    </span>
+                    <span class="badge-ligne" style="background:#${l.route_color || '185FA5'};color:#${l.route_text_color || 'FFFFFF'}">
+                        ${iconeType(l.route_type)} ${l.route_id}
+                    </span>
+                    <span style="flex:1">
+                        <strong>${r.stop_name}</strong><br>
+                        <span style="font-size:11px;color:#666">→ ${l.trip_headsign || ''}</span>
+                    </span>
+                </div>
+            `;
         });
-
-        const marqueur = L.marker([r.stop_lat, r.stop_lon], { icon: halo }).addTo(carte);
-
-        marqueur.bindPopup(`
-            <strong>${icone} Ligne ${r.route_id}</strong><br>
-            <span style="font-size:11px;background:#${r.route_color || '185FA5'};color:#${r.route_text_color || 'FFFFFF'};padding:2px 6px;border-radius:4px">
-                → ${r.trip_headsign || ''}
-            </span><br><br>
-            ${r.stop_name}<br>
-            <span style="color:#E24B4A;font-weight:600">Retard : +${retard} min</span>
-        `);
-
-        marqueurs.push(marqueur);
-
-        liste.innerHTML += `
-            <div class="alerte">
-                <span class="alerte-badge ${classeRetard(retard)}">
-                    +${retard} min
-                </span>
-                <span class="badge-ligne" style="background:#${r.route_color || '185FA5'};color:#${r.route_text_color || 'FFFFFF'}">
-                    ${icone} ${r.route_id}
-                </span>
-                <span style="flex:1">
-                    <strong>${r.stop_name}</strong><br>
-                    <span style="font-size:11px;color:#666">→ ${r.trip_headsign || ''}</span>
-                </span>
-            </div>
-        `;
     });
 
     if (!retards.length) {
@@ -193,7 +200,7 @@ function afficherAlertes(retards) {
 }
 
 function renderFiltresLignes(retards) {
-    const lignes = [...new Set(retards.map(r => r.route_id))].sort();
+    const lignes = [...new Set(retards.flatMap(r => r.lignes.map(l => l.route_id)))].sort();
     const filtres = document.getElementById('filtres-lignes');
     filtres.innerHTML =
         `<button class="filtre-ligne actif" onclick="filtrerLigne(null, this)">Toutes</button>` +
@@ -216,7 +223,9 @@ function filtrerLigne(ligne, el) {
     if (!ligne) {
         afficherAlertes(tousLesRetards);
     } else {
-        const filtres = tousLesRetards.filter(r => r.route_id === ligne);
+        const filtres = tousLesRetards.filter(r =>
+            r.lignes.some(l => l.route_id === ligne)
+        );
         afficherAlertes(filtres);
     }
 }
@@ -238,7 +247,6 @@ window.filtrerLigne = filtrerLigne;
 
 chargerLignes().then(() => {
     chargerTraces();
-    chargerArrets();
     chargerTout();
     setInterval(chargerTout, 60000);
 });
