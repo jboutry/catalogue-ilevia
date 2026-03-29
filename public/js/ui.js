@@ -52,10 +52,14 @@ function afficherPanel(d) {
         </div>
         <p>${d.description}</p>
         <div class="section-label">Informations</div>
-        <div><strong>Owner :</strong> ${d.owner_metier}</div>
-        <div><strong>Source :</strong> ${d.source_systeme}</div>
-        <div><strong>Mise à jour :</strong> ${d.frequence_maj}</div>
-        <div><strong>Sensibilité :</strong> ${d.sensibilite}</div>
+<div><strong>Owner :</strong> ${d.owner_metier}</div>
+<div><strong>Source :</strong> ${d.source_systeme}</div>
+<div><strong>Mise à jour :</strong> ${d.frequence_maj}</div>
+<div><strong>Sensibilité :</strong> ${d.sensibilite}</div>
+${d.alerte ? `
+    <div class="section-label">Alerte</div>
+    <div class="alerte-panel">${d.alerte}</div>
+` : ''}
         <div class="section-label">Tags</div>
         <div class="tags">${(d.tags || []).map(t =>
             `<span class="tag">${t}</span>`

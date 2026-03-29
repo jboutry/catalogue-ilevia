@@ -282,3 +282,13 @@
     margin-top: 2px;
     text-transform: uppercase;
 }
+
+.alerte-panel {
+    background: #FAEEDA;
+    color: #633806;
+    border-left: 4px solid #BA7517;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-top: 6px;
+}
