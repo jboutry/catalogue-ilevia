@@ -67,11 +67,14 @@ app.get('/api/retards', async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT route_id, stop_name, stop_lat, stop_lon,
+                   route_short_name, route_type,
+                   route_color, route_text_color,
+                   trip_headsign, direction_id,
                    ROUND(retard_minutes::numeric, 1) AS retard_minutes
             FROM transport.v_retards
             WHERE retard_minutes >= 2
             ORDER BY retard_minutes DESC
-            LIMIT 50
+            LIMIT 500
         `);
         res.json(result.rows);
     } catch (err) {
@@ -79,12 +82,16 @@ app.get('/api/retards', async (req, res) => {
     }
 });
 
-// Route : passages prochaine heure
+// Route : passages 
 app.get('/api/passages', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT DISTINCT ON (st.stop_id, t.route_id)
+            SELECT DISTINCT ON (s.stop_id, t.route_id)
                 t.route_id,
+                r.route_color,
+                r.route_text_color,
+                r.route_type,
+                s.stop_id,
                 s.stop_name,
                 s.stop_lat,
                 s.stop_lon,
@@ -92,10 +99,11 @@ app.get('/api/passages', async (req, res) => {
             FROM transport.stop_times st
             JOIN transport.stops s ON st.stop_id = s.stop_id
             JOIN transport.trips t ON st.trip_id = t.trip_id
-            WHERE (CURRENT_DATE + st.departure_time::interval)
-                BETWEEN now() AND now() + INTERVAL '1 hour'
-            ORDER BY st.stop_id, t.route_id, heure_theorique ASC
-            LIMIT 500
+            LEFT JOIN transport.routes r ON t.route_id = r.route_id
+            WHERE (CURRENT_DATE + st.departure_time::interval) > now()
+            AND (s.location_type = 0 OR s.location_type IS NULL)
+            ORDER BY s.stop_id, t.route_id, heure_theorique ASC
+            LIMIT 5000
         `);
         res.json(result.rows);
     } catch (err) {
@@ -151,7 +159,38 @@ app.patch('/api/datasets/:id', async (req, res) => {
     }
 });
 
+app.get('/api/lignes', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                route_id,
+                route_short_name,
+                route_type,
+                route_color,
+                route_text_color
+            FROM transport.routes
+            ORDER BY route_type, route_short_name
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
+app.get('/api/arrets', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT stop_id, stop_name, stop_lat, stop_lon
+            FROM transport.stops
+            WHERE stop_lat IS NOT NULL
+            AND stop_lon IS NOT NULL
+            AND location_type = 1
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 
 // Fichiers statiques — TOUJOURS après les routes API

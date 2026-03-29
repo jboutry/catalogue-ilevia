@@ -1,4 +1,5 @@
 let tousLesRetards = [];
+let toutesLesLignes = {};
 
 const carte = L.map('carte').setView([50.633, 3.058], 12);
 
@@ -8,6 +9,20 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
 
 const marqueurs = [];
 const marqueursPonctuels = [];
+const marqueurArrets = [];
+let tracesLignes = L.layerGroup();
+
+function iconeType(route_type) {
+    if (route_type === 0) return '🚋';
+    if (route_type === 1) return '🚇';
+    return '🚌';
+}
+
+function couleurLigne(route_id) {
+    const ligne = toutesLesLignes[route_id];
+    if (ligne && ligne.route_color) return '#' + ligne.route_color;
+    return '#185FA5';
+}
 
 function couleurRetard(minutes) {
     if (minutes >= 10) return '#E24B4A';
@@ -21,6 +36,64 @@ function classeRetard(minutes) {
     return 'retard-faible';
 }
 
+function toggleTraces(btn) {
+    if (carte.hasLayer(tracesLignes)) {
+        carte.removeLayer(tracesLignes);
+        btn.textContent = '🗺️ Tracés OFF';
+    } else {
+        carte.addLayer(tracesLignes);
+        btn.textContent = '🗺️ Tracés ON';
+    }
+}
+window.toggleTraces = toggleTraces;
+
+async function chargerLignes() {
+    const response = await fetch('/api/lignes');
+    const data = await response.json();
+    data.forEach(l => {
+        toutesLesLignes[l.route_id] = l;
+    });
+}
+
+async function chargerTraces() {
+    const response = await fetch(
+        'https://data.lillemetropole.fr/data/ogcapi/collections/ilevia:ilevia_traceslignes/items?limit=500&f=geojson'
+    );
+    const data = await response.json();
+    tracesLignes.clearLayers();
+    L.geoJSON(data, {
+        style: feature => ({
+            color: '#' + feature.properties.rgbhex_fond,
+            weight: 2,
+            opacity: 0.5
+        }),
+        onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            layer.bindPopup(`
+                <strong>Ligne ${p.ligne}</strong><br>
+                <span style="font-size:11px;color:#666">${p.name}</span>
+            `);
+        }
+    }).addTo(tracesLignes);
+}
+
+async function chargerArrets() {
+    const response = await fetch('/api/arrets');
+    const data = await response.json();
+    data.forEach(a => {
+        const cercle = L.circleMarker([a.stop_lat, a.stop_lon], {
+            radius: 3,
+            fillColor: '#888',
+            color: '#fff',
+            weight: 1,
+            fillOpacity: 0.6,
+            zIndexOffset: -200
+        }).addTo(carte);
+        cercle.bindPopup(`<strong>${a.stop_name}</strong>`);
+        marqueurArrets.push(cercle);
+    });
+}
+
 async function chargerPassages() {
     const response = await fetch('/api/passages');
     const data = await response.json();
@@ -29,20 +102,24 @@ async function chargerPassages() {
     marqueursPonctuels.length = 0;
 
     data.forEach(p => {
-        const cercle = L.circleMarker(
-            [p.stop_lat, p.stop_lon], {
-            radius: 5,
-            fillColor: '#1D9E75',
+        const couleur = p.route_color ? '#' + p.route_color : '#888';
+        const icone = iconeType(p.route_type);
+
+        const cercle = L.circleMarker([p.stop_lat, p.stop_lon], {
+            radius: 4,
+            fillColor: couleur,
             color: '#fff',
             weight: 1,
-            fillOpacity: 0.5,
+            fillOpacity: 0.6,
             zIndexOffset: -100
         }).addTo(carte);
 
         cercle.bindPopup(`
-            <strong>${p.stop_name}</strong><br>
-            Ligne ${p.route_id}<br>
-            Passage : ${new Date(p.heure_theorique).toLocaleTimeString('fr-FR')}
+            <strong>${icone} Ligne ${p.route_id}</strong><br>
+            ${p.stop_name}<br>
+            <span style="color:#666;font-size:11px">
+                Prochain passage : ${new Date(p.heure_theorique).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}
+            </span>
         `);
 
         marqueursPonctuels.push(cercle);
@@ -63,30 +140,49 @@ function afficherAlertes(retards) {
 
     retards.forEach(r => {
         const retard = parseFloat(r.retard_minutes);
+        const ligne = toutesLesLignes[r.route_id];
+        const icone = ligne ? iconeType(ligne.route_type) : '🚌';
+        const couleur = r.route_color ? '#' + r.route_color : couleurRetard(retard);
 
-        const cercle = L.circleMarker(
-            [r.stop_lat, r.stop_lon], {
-            radius: 8,
-            fillColor: couleurRetard(retard),
-            color: '#fff',
-            weight: 2,
-            fillOpacity: 0.9
-        }).addTo(carte);
+        const halo = L.divIcon({
+            className: '',
+            html: `
+                <div class="halo-marker" style="
+                    width:12px;height:12px;
+                    border-radius:50%;
+                    border:2px solid #E24B4A;
+                    box-shadow: 0 0 4px 2px #E24B4A;
+                "></div>
+            `,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        });
 
-        cercle.bindPopup(`
-            <strong>${r.stop_name}</strong><br>
-            Ligne ${r.route_id}<br>
-            Retard : ${retard} min
+        const marqueur = L.marker([r.stop_lat, r.stop_lon], { icon: halo }).addTo(carte);
+
+        marqueur.bindPopup(`
+            <strong>${icone} Ligne ${r.route_id}</strong><br>
+            <span style="font-size:11px;background:#${r.route_color || '185FA5'};color:#${r.route_text_color || 'FFFFFF'};padding:2px 6px;border-radius:4px">
+                → ${r.trip_headsign || ''}
+            </span><br><br>
+            ${r.stop_name}<br>
+            <span style="color:#E24B4A;font-weight:600">Retard : +${retard} min</span>
         `);
 
-        marqueurs.push(cercle);
+        marqueurs.push(marqueur);
 
         liste.innerHTML += `
             <div class="alerte">
                 <span class="alerte-badge ${classeRetard(retard)}">
                     +${retard} min
                 </span>
-                <span><strong>Ligne ${r.route_id}</strong> — ${r.stop_name}</span>
+                <span class="badge-ligne" style="background:#${r.route_color || '185FA5'};color:#${r.route_text_color || 'FFFFFF'}">
+                    ${icone} ${r.route_id}
+                </span>
+                <span style="flex:1">
+                    <strong>${r.stop_name}</strong><br>
+                    <span style="font-size:11px;color:#666">→ ${r.trip_headsign || ''}</span>
+                </span>
             </div>
         `;
     });
@@ -101,11 +197,17 @@ function renderFiltresLignes(retards) {
     const filtres = document.getElementById('filtres-lignes');
     filtres.innerHTML =
         `<button class="filtre-ligne actif" onclick="filtrerLigne(null, this)">Toutes</button>` +
-        lignes.map(l => `
-            <button class="filtre-ligne" onclick="filtrerLigne('${l}', this)">
-                ${l}
-            </button>
-        `).join('');
+        lignes.map(l => {
+            const info = toutesLesLignes[l];
+            const bg = info ? '#' + info.route_color : '#185FA5';
+            const fg = info ? '#' + info.route_text_color : '#FFFFFF';
+            const icone = info ? iconeType(info.route_type) : '🚌';
+            return `<button class="filtre-ligne"
+                style="background:${bg};color:${fg};border-color:${bg}"
+                onclick="filtrerLigne('${l}', this)">
+                ${icone} ${l}
+            </button>`;
+        }).join('');
 }
 
 function filtrerLigne(ligne, el) {
@@ -134,5 +236,9 @@ async function chargerTout() {
 
 window.filtrerLigne = filtrerLigne;
 
-chargerTout();
-setInterval(chargerTout, 60000);
+chargerLignes().then(() => {
+    chargerTraces();
+    chargerArrets();
+    chargerTout();
+    setInterval(chargerTout, 60000);
+});
